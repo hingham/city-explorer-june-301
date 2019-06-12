@@ -13,27 +13,18 @@ const PORT = process.env.PORT; //PORT = 3000
 const app = express();
 app.use(cors());
 
-app.get('/location', handleLocationRequest);
-app.get('/weather', handleWeatherRequest);
-
-app.listen(PORT, () => console.log('Listening on PORT', PORT));
-
-function handleLocationRequest(request, response) {
-    //TODO: create the url for the geocode google API
-    //TODO: run a get request with superagent 
-    //TODO: send the response from superagent to our client (browser)
-
-    const URL = `https://maps.googleapis.com/maps/api/geocode/json?address=${request.query.data}&key=${process.env.GEO_API_KEY}`;
-
+app.get('/location', (req, res)=>{
+  const URL = `https://maps.googleapis.com/maps/api/geocode/json?address=${req.query.data}&key=${process.env.GEO_API_KEY}`;
     return superagent.get(URL)
-    .then(res => {
-        const location = new Location(request.query.data, res.body);
-        response.send(location);
+    .then(results => {
+        const location = new Location(req.query.data, results.body);
+        res.send(location);
     })
     .catch(error=>{
-        handleError(error, response);
+        handleError(error, res);
     })
-}
+});
+
 
 function Location(query, rawData) {
   this.search_query = query;
@@ -41,6 +32,11 @@ function Location(query, rawData) {
   this.latitude = rawData.results[0].geometry.location.lat;
   this.longitude = rawData.results[0].geometry.location.lng;
 }
+
+app.get('/weather', handleWeatherRequest);
+
+app.listen(PORT, () => console.log('Listening on PORT', PORT));
+
 
 function handleWeatherRequest(request, response) {
   try {
