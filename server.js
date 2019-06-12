@@ -1,65 +1,76 @@
-"use strict";
+'use strict';
 
-require("dotenv").config();
+// Wire up environment variables
+require('dotenv').config();
 
-//Application Dependencies
-const express = require("express");
-const cors = require("cors");
+// Application dependencies`
+const express = require('express');
+const cors = require('cors');
+const superagent = require('superagent');
 
-//Application SetUp
-const PORT = process.env.PORT;
+// Application set up
+const PORT = process.env.PORT; //PORT = 3000
 const app = express();
 app.use(cors());
 
-app.get("/location", (req, res) => {
-  try {
-    console.log(req);
-    const locationData = searchToLatLong(req.query.data);
-    const location = new Location(req.query.data, locationData.results[0]);
-    res.send(location);
-  } catch (error) {
-    console.error(error);
-    res.status(500).send("Status 500. Somthing went wrong");
-  }
-});
+app.get('/location', handleLocationRequest);
+app.get('/weather', handleWeatherRequest);
 
-app.get("/weather", (req, res) => {
-  try {
-    const weatherData = getWeatherData(req.query.data);
-    res.send(weatherData);
-  } catch (error) {
-    res.status(500).send("Status 500. Something went wrong");
-  }
-});
+app.listen(PORT, () => console.log('Listening on PORT', PORT));
 
+function handleLocationRequest(request, response) {
+    //TODO: create the url for the geocode google API
+    //TODO: run a get request with superagent 
+    //TODO: send the response from superagent to our client (browser)
 
+    const URL = `https://maps.googleapis.com/maps/api/geocode/json?address=${request.query.data}&key=${process.env.GEO_API_KEY}`;
 
-function getWeatherData(query) {
-  const weather = require("./data/darksky.json");
-  const weatherArr = [];
-
-  weather.daily.data.forEach(day => {
-    let weather = new Weather(day);
-    weatherArr.push(weather);
-  });
-
-  return weatherArr;
+    return superagent.get(URL)
+    .then(res => {
+        const location = new Location(request.query.data, res.body);
+        response.send(location);
+    })
+    .catch(error=>{
+        handleError(error, response);
+    })
 }
 
-function Weather(day) {
-    (this.forecast = day.summary), (this.time = new Date(day.time));
-  }
-
-function searchToLatLong(query) {
-  const geoData = require("./data/geo.json");
-  return geoData;
-}
-
-function Location(query, data) {
+function Location(query, rawData) {
   this.search_query = query;
-  this.formatted_query = data.formatted_address;
-  this.latitude = data.geometry.location.lat;
-  this.longitude = data.geometry.location.lng;
+  this.formatted_query = rawData.results[0].formatted_address;
+  this.latitude = rawData.results[0].geometry.location.lat;
+  this.longitude = rawData.results[0].geometry.location.lng;
 }
 
-app.listen(PORT, () => console.log(`app is up and listening on ${PORT}`));
+function handleWeatherRequest(request, response) {
+  try {
+    const rawData = require('./data/darksky.json');
+    const daySummaries = [];
+    rawData.daily.data.forEach(dayData => {
+      daySummaries.push(new Weather(dayData));
+    });
+
+    response.send(daySummaries);
+
+  } catch (error) {
+    handleError(error, response);
+  }
+}
+
+function Weather(dayData) {
+  this.forecast = dayData.summary;
+  // time returned is "epoch seconds" and we want "epoch milliseconds"
+  // so multiply by 1000
+  // the "epoch" began midnight January 1, 1970                     
+  this.time = new Date(dayData.time * 1000).toString().slice(0,15);
+}
+       
+function handleError(error, response) {
+  console.error(error);
+  response.status(500).send('Ruh roh');
+}
+
+
+
+
+
